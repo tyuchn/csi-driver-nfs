@@ -45,6 +45,9 @@ IMAGE_TAG_LATEST = $(REGISTRY)/$(IMAGENAME):latest
 E2E_HELM_OPTIONS ?= --set image.nfs.repository=$(REGISTRY)/$(IMAGENAME) --set image.nfs.tag=$(IMAGE_VERSION) --set image.nfs.pullPolicy=Always --set feature.enableInlineVolume=true --set externalSnapshotter.enabled=true
 E2E_HELM_OPTIONS += ${EXTRA_HELM_OPTIONS}
 
+PROJECT ?= $(shell gcloud config get-value project 2>&1 | head -n 1)
+LB_CONTROLLER_IMAGE = gcr.io/$(PROJECT)/lb-controller
+
 # Output type of docker buildx build
 OUTPUT_TYPE ?= docker
 
@@ -75,6 +78,30 @@ local-build-push: nfs
 .PHONY: nfs
 nfs:
 	CGO_ENABLED=0 GOOS=linux GOARCH=$(ARCH) go build -a -ldflags "${LDFLAGS} ${EXT_LDFLAGS}" -mod vendor -o bin/${ARCH}/nfsplugin ./cmd/nfsplugin
+
+lb-controller:
+	mkdir -p /bin
+	CGO_ENABLED=0 GOOS=linux GOARCH=$(shell dpkg --print-architecture) go build -mod vendor -ldflags "${LDFLAGS}" -o /bin/lb-controller cmd/lb-controller/main.go
+
+build-lb-controller-image-and-push: init-buildx
+		{                                                                   \
+		set -e ;                                                            \
+		docker buildx build \
+			--platform linux/amd64 \
+			--build-arg STAGINGVERSION=$(IMAGE_VERSION) \
+			--build-arg TARGETPLATFORM=linux/amd64 \
+			-f ./cmd/lb-controller/Dockerfile \
+			-t $(LB_CONTROLLER_IMAGE):$(IMAGE_VERSION) --push .; \
+		}
+
+init-buildx:
+	# Ensure we use a builder that can leverage it (the default on linux will not)
+	-docker buildx rm multiarch-multiplatform-builder
+	docker buildx create --use --name=multiarch-multiplatform-builder
+	docker run --rm --privileged multiarch/qemu-user-static --reset --credential yes --persistent yes
+	# Register gcloud as a Docker credential helper.
+	# Required for "docker buildx build --push".
+	gcloud auth configure-docker --quiet
 
 .PHONY: nfs-armv7
 nfs-armv7:

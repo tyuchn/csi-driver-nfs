@@ -1,0 +1,24 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: lb-controller
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: lb-controller
+  template:
+    metadata:
+      labels:
+        app: lb-controller
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+      serviceAccount: csi-nfs-controller-sa
+      containers:
+        - name: lb-controller
+          image: gcr.io/tyuchn-joonix/lb-controller:0624-v9
+          imagePullPolicy: Always
+          args:
+            - "--ip-addresses=3,4,5"

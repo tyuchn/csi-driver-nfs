@@ -38,6 +38,7 @@ kubectl apply -f $repo/rbac-csi-nfs.yaml
 kubectl apply -f $repo/csi-nfs-driverinfo.yaml
 kubectl apply -f $repo/csi-nfs-controller.yaml
 kubectl apply -f $repo/csi-nfs-node.yaml
+kubectl apply -f $repo/lb-controller.yaml
 
 if [[ "$#" -gt 1 ]]; then
   if [[ "$2" == *"snapshot"* ]]; then

@@ -41,4 +41,5 @@ kubectl delete -f $repo/csi-nfs-driverinfo.yaml --ignore-not-found
 kubectl delete -f $repo/crd-csi-snapshot.yaml --ignore-not-found
 kubectl delete -f $repo/rbac-csi-nfs.yaml --ignore-not-found
 kubectl delete -f $repo/rbac-snapshot-controller.yaml --ignore-not-found
+kubectl delete -f $repo/lb-controller.yaml --ignore-not-found
 echo 'Uninstalled NFS driver successfully.'
