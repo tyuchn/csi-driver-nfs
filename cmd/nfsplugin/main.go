@@ -33,6 +33,7 @@ var (
 	workingMountDir              = flag.String("working-mount-dir", "/tmp", "working directory for provisioner to mount nfs shares temporarily")
 	defaultOnDeletePolicy        = flag.String("default-ondelete-policy", "", "default policy for deleting subdirectory when deleting a volume")
 	volStatsCacheExpireInMinutes = flag.Int("vol-stats-cache-expire-in-minutes", 10, "The cache expire time in minutes for volume stats cache")
+	enableNodeLB                 = flag.Bool("enable-node-lb", false, "When enabled, an external load balancer will assign NFS server IPs to each node. This only works for a single NFS instance")
 )
 
 func main() {
@@ -57,6 +58,11 @@ func handle() {
 		DefaultOnDeletePolicy:        *defaultOnDeletePolicy,
 		VolStatsCacheExpireInMinutes: *volStatsCacheExpireInMinutes,
 	}
+
+	if *enableNodeLB {
+		driverOptions.NodeLB = nfs.InitNodeLB()
+	}
+
 	d := nfs.NewDriver(&driverOptions)
 	d.Run(false)
 }

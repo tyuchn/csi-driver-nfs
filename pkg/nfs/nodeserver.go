@@ -105,6 +105,14 @@ func (ns *NodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("%v is a required parameter", paramShare))
 	}
 	server = getServerFromSource(server)
+
+	if ns.Driver.nodeLB != nil {
+		var err error
+		if server, err = ns.Driver.nodeLB.getIP(); err != nil || server == "" {
+			return nil, status.Error(codes.Unavailable, fmt.Sprintf("node IP not found: %v", err))
+		}
+	}
+
 	source := fmt.Sprintf("%s:%s", server, baseDir)
 	if subDir != "" {
 		// replace pv/pvc name namespace metadata in subDir

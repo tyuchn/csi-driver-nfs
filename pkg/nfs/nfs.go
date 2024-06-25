@@ -37,6 +37,7 @@ type DriverOptions struct {
 	WorkingMountDir              string
 	DefaultOnDeletePolicy        string
 	VolStatsCacheExpireInMinutes int
+	NodeLB                       *NodeLB
 }
 
 type Driver struct {
@@ -57,6 +58,8 @@ type Driver struct {
 	// a timed cache storing volume stats <volumeID, volumeStats>
 	volStatsCache                azcache.Resource
 	volStatsCacheExpireInMinutes int
+
+	nodeLB *NodeLB
 }
 
 const (
@@ -91,6 +94,7 @@ func NewDriver(options *DriverOptions) *Driver {
 		mountPermissions:             options.MountPermissions,
 		workingMountDir:              options.WorkingMountDir,
 		volStatsCacheExpireInMinutes: options.VolStatsCacheExpireInMinutes,
+		nodeLB:                       options.NodeLB,
 	}
 
 	n.AddControllerServiceCapabilities([]csi.ControllerServiceCapability_RPC_Type{
