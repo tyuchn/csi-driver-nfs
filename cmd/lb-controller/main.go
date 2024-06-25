@@ -167,7 +167,7 @@ func (c *Controller) syncNode(key string) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
-	if err := c.assignIPToNode(node); err != nil {
+	if err := c.assignIPToNode(node.DeepCopy()); err != nil {
 		return err
 	}
 
@@ -190,6 +190,15 @@ func (c *Controller) onNodeDelete(obj interface{}) {
 }
 
 func (c *Controller) assignIPToNode(node *corev1.Node) error {
+	if ip, exists := node.Annotations[nodeAnnotation]; exists {
+		klog.Infof("Node %q already have IP %q assigned", node.Name, ip)
+		if _, exists := c.ipMap[ip]; exists {
+			c.ipMap[ip]++
+
+			return nil
+		}
+		klog.Infof("IP %q not found among the NFS server IP list. Reassigning a new IP to node %q", ip, node.Name)
+	}
 	// Sort IPs by their current count
 	ips := make([]string, 0, len(c.ipMap))
 	for ip := range c.ipMap {

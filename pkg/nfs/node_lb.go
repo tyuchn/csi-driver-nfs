@@ -43,11 +43,12 @@ func (lb *NodeLB) getIP() (string, error) {
 	ctx := context.Background()
 	node, err := lb.client.CoreV1().Nodes().Get(ctx, lb.nodeName, metav1.GetOptions{})
 	if err != nil {
-		return "", fmt.Errorf("no assigned IP found for node %s", lb.nodeName)
+		return "", fmt.Errorf("failed to get node %s: %v", lb.nodeName, err)
 	}
 
 	ip, ok := node.Annotations["nfs.csi.k8s.io/assigned-ip"]
 	if !ok {
+		klog.Infof("Node annotations are %v", node.Annotations)
 		return "", fmt.Errorf("no assigned IP found for node %s", lb.nodeName)
 	}
 

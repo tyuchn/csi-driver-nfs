@@ -1,8 +1,6 @@
 #!/bin/bash
 
-make nfs
-docker build -t nfsplugin:latest .
-kind load docker-image nfsplugin:latest
+make build-nfs-csi-image-and-push
 make build-lb-controller-image-and-push
 deploy/msau-deploy.sh
 
