@@ -93,7 +93,7 @@ spec:
               drop:
                 - ALL
             allowPrivilegeEscalation: true
-          image: nfsplugin:latest
+          image: gcr.io/gcs-tess/nfsplugin:latest
           args:
             - "-v=5"
             - "--nodeid=$(NODE_ID)"

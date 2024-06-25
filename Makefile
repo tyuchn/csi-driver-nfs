@@ -47,6 +47,7 @@ E2E_HELM_OPTIONS += ${EXTRA_HELM_OPTIONS}
 
 PROJECT ?= $(shell gcloud config get-value project 2>&1 | head -n 1)
 LB_CONTROLLER_IMAGE = gcr.io/$(PROJECT)/lb-controller
+NFS_CSI_IMAGE = gcr.io/$(PROJECT)/nfsplugin
 
 # Output type of docker buildx build
 OUTPUT_TYPE ?= docker
@@ -94,6 +95,15 @@ build-lb-controller-image-and-push: init-buildx
 			--build-arg TARGETPLATFORM=linux/amd64 \
 			-f ./cmd/lb-controller/Dockerfile \
 			-t $(LB_CONTROLLER_IMAGE):$(IMAGE_VERSION) --push .; \
+		}
+
+build-nfs-csi-image-and-push: init-buildx
+		{                                                                   \
+		set -e ;                                                            \
+		docker buildx build \
+			--platform linux/amd64 \
+			-f ./Dockerfile \
+			-t $(NFS_CSI_IMAGE):$(IMAGE_VERSION) --push .; \
 		}
 
 init-buildx:
