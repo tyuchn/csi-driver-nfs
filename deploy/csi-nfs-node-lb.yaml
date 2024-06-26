@@ -91,6 +91,14 @@ spec:
             requests:
               cpu: 10m
               memory: 20Mi
+        - name: nfs-services
+          image: gcr.io/gcs-tess/nfsplugin:latest
+          imagePullPolicy: "IfNotPresent"
+          command: ["/nfs_services_start.sh"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 110Mi
       volumes:
         - name: socket-dir
           hostPath:

@@ -102,7 +102,7 @@ build-nfs-csi-image-and-push: init-buildx
 		set -e ;                                                            \
 		docker buildx build \
 			--platform linux/amd64 \
-			-f ./Dockerfile \
+			-f ./Dockerfile.poc \
 			-t $(NFS_CSI_IMAGE):$(IMAGE_VERSION) --push .; \
 		}
 
