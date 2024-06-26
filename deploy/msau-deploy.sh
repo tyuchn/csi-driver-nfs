@@ -16,12 +16,12 @@
 
 repo="./deploy"
 
-echo "Deleting NFS CSI driver"
-kubectl delete -f $repo/csi-nfs-node-lb.yaml --ignore-not-found
-kubectl delete -f $repo/lb-controller.yaml --ignore-not-found
-kubectl delete -f $repo/rbac-csi-nfs-node-lb.yaml --ignore-not-found
-kubectl delete -f $repo/csi-nfs-driverinfo.yaml --ignore-not-found
-kubectl delete -f $repo/rbac-lb-controller.yaml --ignore-not-found
+# echo "Deleting NFS CSI driver"
+# kubectl delete -f $repo/csi-nfs-node-lb.yaml --ignore-not-found
+# kubectl delete -f $repo/lb-controller.yaml --ignore-not-found
+# kubectl delete -f $repo/rbac-csi-nfs-node-lb.yaml --ignore-not-found
+# kubectl delete -f $repo/csi-nfs-driverinfo.yaml --ignore-not-found
+# kubectl delete -f $repo/rbac-lb-controller.yaml --ignore-not-found
 
 echo "Installing NFS CSI driver"
 kubectl apply -f $repo/rbac-csi-nfs-node-lb.yaml
