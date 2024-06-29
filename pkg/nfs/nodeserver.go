@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/kubernetes-csi/csi-driver-nfs/pkg/lbcontroller"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -105,6 +106,12 @@ func (ns *NodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("%v is a required parameter", paramShare))
 	}
 	server = getServerFromSource(server)
+
+	pc := req.GetPublishContext()
+	if ip, ok := pc[lbcontroller.NodeAnnotation]; ok {
+		klog.Infof("NodePublishVolume found IP %q from PublishContext for volume %q", ip, volumeID)
+		server = ip
+	}
 
 	if ns.Driver.nodeLB != nil {
 		var err error

@@ -97,7 +97,7 @@ build-lb-controller-image-and-push: init-buildx
 			-t $(LB_CONTROLLER_IMAGE):$(IMAGE_VERSION) --push .; \
 		}
 
-build-nfs-csi-image-and-push: init-buildx
+build-nfs-csi-image-and-push: nfs init-buildx
 		{                                                                   \
 		set -e ;                                                            \
 		docker buildx build \

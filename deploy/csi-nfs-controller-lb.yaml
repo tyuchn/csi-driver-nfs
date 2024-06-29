@@ -1,0 +1,170 @@
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: csi-nfs-controller
+  namespace: kube-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: csi-nfs-controller
+  template:
+    metadata:
+      labels:
+        app: csi-nfs-controller
+    spec:
+      hostNetwork: true  # controller also needs to mount nfs to create dir
+      dnsPolicy: ClusterFirstWithHostNet  # available values: Default, ClusterFirstWithHostNet, ClusterFirst
+      serviceAccountName: csi-nfs-controller-sa
+      nodeSelector:
+        kubernetes.io/os: linux  # add "kubernetes.io/role: master" to run controller on master node
+      priorityClassName: system-cluster-critical
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      tolerations:
+        - key: "node-role.kubernetes.io/master"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "node-role.kubernetes.io/controlplane"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "node-role.kubernetes.io/control-plane"
+          operator: "Exists"
+          effect: "NoSchedule"
+      containers:
+        - name: csi-provisioner
+          image: registry.k8s.io/sig-storage/csi-provisioner:v4.0.0
+          args:
+            - "-v=2"
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election"
+            - "--leader-election-namespace=kube-system"
+            - "--extra-create-metadata=true"
+            - "--timeout=1200s"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          volumeMounts:
+            - mountPath: /csi
+              name: socket-dir
+          resources:
+            limits:
+              memory: 400Mi
+            requests:
+              cpu: 10m
+              memory: 20Mi
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+        - name: csi-attacher
+          image: registry.k8s.io/sig-storage/csi-attacher:v4.6.1
+          args:
+            - "--v=2"
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election"
+            - "--leader-election-namespace=kube-system"
+            - "--timeout=1200s"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: csi-snapshotter
+          image: registry.k8s.io/sig-storage/csi-snapshotter:v6.3.3
+          args:
+            - "--v=2"
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election-namespace=kube-system"
+            - "--leader-election"
+            - "--timeout=1200s"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+          resources:
+            limits:
+              memory: 200Mi
+            requests:
+              cpu: 10m
+              memory: 20Mi
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+        - name: liveness-probe
+          image: registry.k8s.io/sig-storage/livenessprobe:v2.12.0
+          args:
+            - --csi-address=/csi/csi.sock
+            - --probe-timeout=3s
+            - --http-endpoint=localhost:29652
+            - --v=2
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+          resources:
+            limits:
+              memory: 100Mi
+            requests:
+              cpu: 10m
+              memory: 20Mi
+          securityContext:
+            capabilities:
+              drop:
+                - ALL
+        - name: nfs
+          image: gcr.io/gcs-tess/nfsplugin:latest
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+              drop:
+                - ALL
+            allowPrivilegeEscalation: true
+          imagePullPolicy: Always
+          args:
+            - "-v=5"
+            - "--nodeid=$(NODE_ID)"
+            - "--endpoint=$(CSI_ENDPOINT)"
+            - "--ip-addresses=10.4.0.163,10.4.0.175,10.4.0.206,10.4.0.166,10.4.0.18,10.4.0.174,10.4.0.205,10.4.0.185,10.4.0.213,10.4.0.211,10.4.0.197,10.4.0.19,10.4.0.203,10.4.0.167,10.4.0.190,10.4.0.189,10.4.0.165,10.4.0.154,10.4.0.208,10.4.0.156,10.4.0.173,10.4.0.180,10.4.0.184,10.4.0.204,10.4.0.172,10.4.0.161,10.4.0.202,10.4.0.151,10.4.0.182,10.4.0.192,10.4.0.171,10.4.0.168,10.4.0.169,10.4.0.195,10.4.0.201,10.4.0.158,10.4.0.155,10.4.0.152,10.4.0.162,10.4.0.198,10.4.0.209,10.4.0.212,10.4.0.187,10.4.0.199,10.4.0.178,10.4.0.160,10.4.0.176,10.4.0.210,10.4.0.207,10.4.0.196,10.4.0.188,10.4.0.159,10.4.0.179,10.4.0.193,10.4.0.177,10.4.0.191,10.4.0.183,10.4.0.181,10.4.0.170,10.4.0.157,10.4.0.153,10.4.0.164,10.4.0.186,10.4.0.194"
+          env:
+            - name: NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+          livenessProbe:
+            failureThreshold: 5
+            httpGet:
+              host: localhost
+              path: /healthz
+              port: 29652
+            initialDelaySeconds: 30
+            timeoutSeconds: 10
+            periodSeconds: 30
+          volumeMounts:
+            - name: pods-mount-dir
+              mountPath: /var/lib/kubelet/pods
+              mountPropagation: "Bidirectional"
+            - mountPath: /csi
+              name: socket-dir
+          resources:
+            limits:
+              memory: 200Mi
+            requests:
+              cpu: 10m
+              memory: 20Mi
+      volumes:
+        - name: pods-mount-dir
+          hostPath:
+            path: /var/lib/kubelet/pods
+            type: Directory
+        - name: socket-dir
+          emptyDir: {}

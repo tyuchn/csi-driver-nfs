@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/kubernetes-csi/csi-driver-nfs/pkg/lbcontroller"
 	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -60,9 +61,15 @@ func NewDefaultIdentityServer(d *Driver) *IdentityServer {
 }
 
 func NewControllerServer(d *Driver) *ControllerServer {
-	return &ControllerServer{
+	c := &ControllerServer{
 		Driver: d,
 	}
+
+	if d.ipList != nil && len(d.ipList) != 0 {
+		c.LBController = *lbcontroller.NewController(d.ipList)
+	}
+
+	return c
 }
 
 func NewControllerServiceCapability(cap csi.ControllerServiceCapability_RPC_Type) *csi.ControllerServiceCapability {

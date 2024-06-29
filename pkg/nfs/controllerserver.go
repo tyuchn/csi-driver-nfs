@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/kubernetes-csi/csi-driver-nfs/pkg/lbcontroller"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -38,6 +39,7 @@ import (
 // ControllerServer controller server setting
 type ControllerServer struct {
 	Driver *Driver
+	lbcontroller.LBController
 }
 
 // nfsVolume is an internal representation of a volume
@@ -274,12 +276,59 @@ func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
-func (cs *ControllerServer) ControllerPublishVolume(_ context.Context, _ *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+func (cs *ControllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
+	volumeID := req.GetVolumeId()
+	nodeID := req.GetNodeId()
+	volumeCapability := req.GetVolumeCapability()
+	if len(volumeID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume Volume ID must be provided")
+	}
+	if len(nodeID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume Node ID must be provided")
+	}
+	if volumeCapability == nil {
+		return nil, status.Error(codes.InvalidArgument, "ControllerPublishVolume Volume capability must be provided")
+	}
+
+	lockingVolumeID := fmt.Sprintf("%s/%s", nodeID, volumeID)
+	if acquired := cs.Driver.volumeLocks.TryAcquire(lockingVolumeID); !acquired {
+		return nil, status.Errorf(codes.Aborted, volumeOperationAlreadyExistsFmt, lockingVolumeID)
+	}
+	defer cs.Driver.volumeLocks.Release(lockingVolumeID)
+
+	ip, err := cs.LBController.AssignIPToNode(ctx, nodeID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to assign a NFS server IP to node %s: %v", nodeID, err)
+	}
+
+	return &csi.ControllerPublishVolumeResponse{
+		PublishContext: map[string]string{lbcontroller.NodeAnnotation: ip},
+	}, nil
 }
 
-func (cs *ControllerServer) ControllerUnpublishVolume(_ context.Context, _ *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "")
+func (cs *ControllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
+	// Validate arguments
+	volumeID := req.GetVolumeId()
+	nodeID := req.GetNodeId()
+	if len(volumeID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "ControllerUnpublishVolume Volume ID must be provided")
+	}
+	if len(nodeID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "ControllerUnpublishVolume Node ID must be provided")
+	}
+
+	lockingVolumeID := fmt.Sprintf("%s/%s", nodeID, volumeID)
+	if acquired := cs.Driver.volumeLocks.TryAcquire(lockingVolumeID); !acquired {
+		return nil, status.Errorf(codes.Aborted, volumeOperationAlreadyExistsFmt, lockingVolumeID)
+	}
+	defer cs.Driver.volumeLocks.Release(lockingVolumeID)
+
+	if err := cs.LBController.RemoveIPFromNode(ctx, nodeID); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to remove IP annotation from node %s: %v", nodeID, err)
+	}
+
+	klog.V(4).Infof("ControllerUnpublishVolume succeeded for volume %v from node %v", volumeID, nodeID)
+	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 
 func (cs *ControllerServer) ControllerGetVolume(_ context.Context, _ *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
@@ -436,6 +485,10 @@ func (cs *ControllerServer) ListSnapshots(_ context.Context, _ *csi.ListSnapshot
 
 func (cs *ControllerServer) ControllerExpandVolume(_ context.Context, _ *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
+}
+
+func (cs *ControllerServer) ControllerModifyVolume(_ context.Context, _ *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "ControllerModifyVolume unsupported")
 }
 
 // Mount nfs server at base-dir

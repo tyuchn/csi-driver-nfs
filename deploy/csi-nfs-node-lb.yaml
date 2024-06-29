@@ -70,7 +70,6 @@ spec:
             - "-v=5"
             - "--nodeid=$(NODE_ID)"
             - "--endpoint=$(CSI_ENDPOINT)"
-            - "--enable-node-lb"
           env:
             - name: NODE_ID
               valueFrom:
@@ -78,7 +77,7 @@ spec:
                   fieldPath: spec.nodeName
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
-          imagePullPolicy: "IfNotPresent"
+          imagePullPolicy: Always
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
@@ -93,7 +92,7 @@ spec:
               memory: 20Mi
         - name: nfs-services
           image: gcr.io/gcs-tess/nfsplugin:latest
-          imagePullPolicy: "IfNotPresent"
+          imagePullPolicy: Always
           command: ["/nfs_services_start.sh"]
           resources:
             requests:

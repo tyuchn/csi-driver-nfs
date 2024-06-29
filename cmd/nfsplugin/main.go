@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"os"
+	"strings"
 
 	"github.com/kubernetes-csi/csi-driver-nfs/pkg/nfs"
 
@@ -34,6 +35,7 @@ var (
 	defaultOnDeletePolicy        = flag.String("default-ondelete-policy", "", "default policy for deleting subdirectory when deleting a volume")
 	volStatsCacheExpireInMinutes = flag.Int("vol-stats-cache-expire-in-minutes", 10, "The cache expire time in minutes for volume stats cache")
 	enableNodeLB                 = flag.Bool("enable-node-lb", false, "When enabled, an external load balancer will assign NFS server IPs to each node. This only works for a single NFS instance")
+	ipAddresses                  = flag.String("ip-addresses", "", "Comma-separated list of NFS server IP addresses")
 )
 
 func main() {
@@ -57,6 +59,11 @@ func handle() {
 		WorkingMountDir:              *workingMountDir,
 		DefaultOnDeletePolicy:        *defaultOnDeletePolicy,
 		VolStatsCacheExpireInMinutes: *volStatsCacheExpireInMinutes,
+	}
+
+	if *ipAddresses != "" {
+		ipList := strings.Split(*ipAddresses, ",")
+		driverOptions.IPList = ipList
 	}
 
 	if *enableNodeLB {

@@ -38,6 +38,7 @@ type DriverOptions struct {
 	DefaultOnDeletePolicy        string
 	VolStatsCacheExpireInMinutes int
 	NodeLB                       *NodeLB
+	IPList                       []string
 }
 
 type Driver struct {
@@ -60,6 +61,7 @@ type Driver struct {
 	volStatsCacheExpireInMinutes int
 
 	nodeLB *NodeLB
+	ipList []string
 }
 
 const (
@@ -95,10 +97,13 @@ func NewDriver(options *DriverOptions) *Driver {
 		workingMountDir:              options.WorkingMountDir,
 		volStatsCacheExpireInMinutes: options.VolStatsCacheExpireInMinutes,
 		nodeLB:                       options.NodeLB,
+		ipList:                       options.IPList,
 	}
 
 	n.AddControllerServiceCapabilities([]csi.ControllerServiceCapability_RPC_Type{
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME,
+		csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME,
+		csi.ControllerServiceCapability_RPC_PUBLISH_READONLY,
 		csi.ControllerServiceCapability_RPC_SINGLE_NODE_MULTI_WRITER,
 		csi.ControllerServiceCapability_RPC_CLONE_VOLUME,
 		csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT,

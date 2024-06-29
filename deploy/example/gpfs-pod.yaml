@@ -46,7 +46,7 @@ spec:
     volumeHandle: nfs-server.default.svc.cluster.local/gpfs/fs1
     volumeAttributes:
       share: /gpfs/fs1
-      server: 10.12.1.64
+      server: 10.4.0.194
 ---
 kind: PersistentVolumeClaim
 apiVersion: v1
