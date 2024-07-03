@@ -66,10 +66,6 @@ func handle() {
 		driverOptions.IPList = ipList
 	}
 
-	if *enableNodeLB {
-		driverOptions.NodeLB = nfs.InitNodeLB()
-	}
-
 	d := nfs.NewDriver(&driverOptions)
 	d.Run(false)
 }

@@ -66,7 +66,7 @@ func NewControllerServer(d *Driver) *ControllerServer {
 	}
 
 	if d.ipList != nil && len(d.ipList) != 0 {
-		c.LBController = *lbcontroller.NewController(d.ipList)
+		c.LBController = *lbcontroller.NewLBController(d.ipList)
 	}
 
 	return c

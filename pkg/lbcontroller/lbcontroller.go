@@ -22,13 +22,13 @@ const (
 )
 
 type LBController struct {
-	clientset  *kubernetes.Clientset
+	clientset  kubernetes.Interface
 	nodeLister listersv1.NodeLister
 	ipMap      map[string]int
 	mutex      sync.Mutex
 }
 
-func NewController(ipList []string) *LBController {
+func NewLBController(ipList []string) *LBController {
 	klog.Infof("Building kube configs for running in cluster...")
 	config, err := rest.InClusterConfig()
 	if err != nil {

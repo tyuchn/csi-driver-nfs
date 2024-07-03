@@ -37,7 +37,6 @@ type DriverOptions struct {
 	WorkingMountDir              string
 	DefaultOnDeletePolicy        string
 	VolStatsCacheExpireInMinutes int
-	NodeLB                       *NodeLB
 	IPList                       []string
 }
 
@@ -60,7 +59,6 @@ type Driver struct {
 	volStatsCache                azcache.Resource
 	volStatsCacheExpireInMinutes int
 
-	nodeLB *NodeLB
 	ipList []string
 }
 
@@ -96,7 +94,6 @@ func NewDriver(options *DriverOptions) *Driver {
 		mountPermissions:             options.MountPermissions,
 		workingMountDir:              options.WorkingMountDir,
 		volStatsCacheExpireInMinutes: options.VolStatsCacheExpireInMinutes,
-		nodeLB:                       options.NodeLB,
 		ipList:                       options.IPList,
 	}
 

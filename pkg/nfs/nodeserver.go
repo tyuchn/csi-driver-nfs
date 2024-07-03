@@ -105,20 +105,15 @@ func (ns *NodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 	if baseDir == "" {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("%v is a required parameter", paramShare))
 	}
-	server = getServerFromSource(server)
 
 	pc := req.GetPublishContext()
-	if ip, ok := pc[lbcontroller.NodeAnnotation]; ok {
-		klog.Infof("NodePublishVolume found IP %q from PublishContext for volume %q", ip, volumeID)
-		server = ip
+	ip, ok := pc[lbcontroller.NodeAnnotation]
+	if !ok {
+		return nil, status.Errorf(codes.InvalidArgument, fmt.Sprintf("NFS server IP not found in PublishContext %v for volume %q", pc, volumeID))
 	}
 
-	if ns.Driver.nodeLB != nil {
-		var err error
-		if server, err = ns.Driver.nodeLB.getIP(); err != nil || server == "" {
-			return nil, status.Error(codes.Unavailable, fmt.Sprintf("node IP not found: %v", err))
-		}
-	}
+	klog.Infof("NodePublishVolume found IP %q from PublishContext for volume %q", ip, volumeID)
+	server = ip
 
 	source := fmt.Sprintf("%s:%s", server, baseDir)
 	if subDir != "" {
