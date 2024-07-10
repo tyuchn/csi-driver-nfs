@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ubuntu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ubuntu
+  template:
+    metadata:
+      labels:
+        app: ubuntu
+    spec:
+      containers:
+      - name: ubuntu
+        image: ubuntu:latest
+        command: ["/bin/bash", "-c", "sleep infinity"]
+        volumeMounts:
+        - name: nfs-vol
+          mountPath: /nfs_vol
+      volumes:
+      - name: nfs-vol
+        persistentVolumeClaim:
+          claimName: nfs-pvc
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nfs-pv
+spec:
+  mountOptions:
+    - vers=3
+    - read_ahead_kb=15360
+    - nolock
+    # - nconnect=16
+    # - rsize=1048576
+    # - wsize=1048576
+  storageClassName: ""
+  capacity:
+    storage: 12Ti
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  volumeMode: Filesystem
+  csi:
+    driver: nfs.csi.k8s.io
+    volumeHandle: nfs-server.default.svc.cluster.local/gpfs/fs1
+    volumeAttributes:
+      # share: /gpfs/fs1
+      # server: 10.4.0.194
+      share: /vol1
+      server: 10.94.112.74
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: nfs-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: nfs-pv
+  resources:
+    requests:
+      storage: 12Ti
