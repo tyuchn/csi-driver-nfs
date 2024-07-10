@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/kubernetes-csi/csi-driver-nfs/pkg/lbcontroller"
 	"github.com/kubernetes-csi/csi-driver-nfs/test/utils/testutil"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/codes"
@@ -112,6 +113,9 @@ func TestNodePublishVolume(t *testing.T) {
 		{
 			desc: "[Success] Stage target path missing",
 			req: csi.NodePublishVolumeRequest{
+				PublishContext: map[string]string{
+					lbcontroller.NodeAnnotation: "10.10.10.10",
+				},
 				VolumeContext:    params,
 				VolumeCapability: &csi.VolumeCapability{AccessMode: &volumeCap},
 				VolumeId:         "vol_1",
@@ -121,6 +125,9 @@ func TestNodePublishVolume(t *testing.T) {
 		{
 			desc: "[Success] Valid request read only",
 			req: csi.NodePublishVolumeRequest{
+				PublishContext: map[string]string{
+					lbcontroller.NodeAnnotation: "10.10.10.10",
+				},
 				VolumeContext:    params,
 				VolumeCapability: &csi.VolumeCapability{AccessMode: &volumeCap},
 				VolumeId:         "vol_1",
@@ -131,6 +138,9 @@ func TestNodePublishVolume(t *testing.T) {
 		{
 			desc: "[Success] Valid request already mounted",
 			req: csi.NodePublishVolumeRequest{
+				PublishContext: map[string]string{
+					lbcontroller.NodeAnnotation: "10.10.10.10",
+				},
 				VolumeContext:    params,
 				VolumeCapability: &csi.VolumeCapability{AccessMode: &volumeCap},
 				VolumeId:         "vol_1",
@@ -141,6 +151,9 @@ func TestNodePublishVolume(t *testing.T) {
 		{
 			desc: "[Success] Valid request",
 			req: csi.NodePublishVolumeRequest{
+				PublishContext: map[string]string{
+					lbcontroller.NodeAnnotation: "10.10.10.10",
+				},
 				VolumeContext:    params,
 				VolumeCapability: &csi.VolumeCapability{AccessMode: &volumeCap},
 				VolumeId:         "vol_1",
@@ -151,6 +164,9 @@ func TestNodePublishVolume(t *testing.T) {
 		{
 			desc: "[Success] Valid request with pv/pvc metadata",
 			req: csi.NodePublishVolumeRequest{
+				PublishContext: map[string]string{
+					lbcontroller.NodeAnnotation: "10.10.10.10",
+				},
 				VolumeContext:    paramsWithMetadata,
 				VolumeCapability: &csi.VolumeCapability{AccessMode: &volumeCap},
 				VolumeId:         "vol_1",
@@ -161,6 +177,9 @@ func TestNodePublishVolume(t *testing.T) {
 		{
 			desc: "[Success] Valid request with 0 mountPermissions",
 			req: csi.NodePublishVolumeRequest{
+				PublishContext: map[string]string{
+					lbcontroller.NodeAnnotation: "10.10.10.10",
+				},
 				VolumeContext:    paramsWithZeroPermissions,
 				VolumeCapability: &csi.VolumeCapability{AccessMode: &volumeCap},
 				VolumeId:         "vol_1",
@@ -171,12 +190,59 @@ func TestNodePublishVolume(t *testing.T) {
 		{
 			desc: "[Error] invalid mountPermissions",
 			req: csi.NodePublishVolumeRequest{
+				PublishContext: map[string]string{
+					lbcontroller.NodeAnnotation: "10.10.10.10",
+				},
 				VolumeContext:    invalidParams,
 				VolumeCapability: &csi.VolumeCapability{AccessMode: &volumeCap},
 				VolumeId:         "vol_1",
 				TargetPath:       targetTest,
 				Readonly:         true},
 			expectedErr: status.Error(codes.InvalidArgument, "invalid mountPermissions 07ab"),
+		},
+		{
+			desc: "[Error] invalid read ahead (non int value)",
+			req: csi.NodePublishVolumeRequest{
+				PublishContext: map[string]string{
+					lbcontroller.NodeAnnotation: "10.10.10.10",
+				},
+				VolumeContext: params,
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &volumeCap,
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{
+							MountFlags: []string{
+								"read_ahead_kb=a",
+							},
+						},
+					},
+				},
+				VolumeId:   "vol_1",
+				TargetPath: targetTest,
+				Readonly:   true},
+			expectedErr: status.Error(codes.InvalidArgument, "invalid read_ahead_kb mount flag \"read_ahead_kb=a\": strconv.ParseInt: parsing \"a\": invalid syntax"),
+		},
+		{
+			desc: "[Error] invalid read ahead (negative value)",
+			req: csi.NodePublishVolumeRequest{
+				PublishContext: map[string]string{
+					lbcontroller.NodeAnnotation: "10.10.10.10",
+				},
+				VolumeContext: params,
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &volumeCap,
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{
+							MountFlags: []string{
+								"read_ahead_kb=-1",
+							},
+						},
+					},
+				},
+				VolumeId:   "vol_1",
+				TargetPath: targetTest,
+				Readonly:   true},
+			expectedErr: status.Error(codes.InvalidArgument, "invalid negative value for read_ahead_kb mount flag: \"read_ahead_kb=-1\""),
 		},
 	}
 

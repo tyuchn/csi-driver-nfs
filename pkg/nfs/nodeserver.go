@@ -19,6 +19,8 @@ package nfs
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +35,14 @@ import (
 	mount "k8s.io/mount-utils"
 
 	azcache "sigs.k8s.io/cloud-provider-azure/pkg/cache"
+)
+
+const (
+	readAheadKBMountFlagRegexPattern = "^read_ahead_kb=(.+)$"
+)
+
+var (
+	readAheadKBMountFlagRegex = regexp.MustCompile(readAheadKBMountFlagRegexPattern)
 )
 
 // NodeServer driver
@@ -140,7 +150,9 @@ func (ns *NodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 	}
 
 	klog.V(2).Infof("NodePublishVolume: volumeID(%v) source(%s) targetPath(%s) mountflags(%v)", volumeID, source, targetPath, mountOptions)
-	err = ns.mounter.Mount(source, targetPath, "nfs", mountOptions)
+	// parse read ahead mount option
+	filteredMountOptions := collectMountOptions(mountOptions)
+	err = ns.mounter.Mount(source, targetPath, "nfs", filteredMountOptions)
 	if err != nil {
 		if os.IsPermission(err) {
 			return nil, status.Error(codes.PermissionDenied, err.Error())
@@ -158,6 +170,18 @@ func (ns *NodeServer) NodePublishVolume(_ context.Context, req *csi.NodePublishV
 	} else {
 		klog.V(2).Infof("skip chmod on targetPath(%s) since mountPermissions is set as 0", targetPath)
 	}
+
+	readAheadKB, shouldUpdateReadAhead, err := extractReadAheadKBMountFlag(mountOptions)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	if shouldUpdateReadAhead {
+		if err := updateReadAhead(targetPath, readAheadKB); err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
+
 	klog.V(2).Infof("volume(%s) mount %s on %s succeeded", volumeID, source, targetPath)
 	return &csi.NodePublishVolumeResponse{}, nil
 }
@@ -313,5 +337,81 @@ func makeDir(pathname string) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func collectMountOptions(mntFlags []string) []string {
+	var options []string
+	for _, opt := range mntFlags {
+		if readAheadKBMountFlagRegex.FindString(opt) != "" {
+			// The read_ahead_kb flag is a special flag that isn't
+			// passed directly as an option to the mount command.
+			continue
+		}
+		options = append(options, opt)
+	}
+	return options
+}
+
+func extractReadAheadKBMountFlag(mountFlags []string) (int64, bool, error) {
+	for _, mountFlag := range mountFlags {
+		if readAheadKB := readAheadKBMountFlagRegex.FindStringSubmatch(mountFlag); len(readAheadKB) == 2 {
+			// There is only one matching pattern in readAheadKBMountFlagRegex
+			// If found, it will be at index 1
+			readAheadKBInt, err := strconv.ParseInt(readAheadKB[1], 10, 0)
+			if err != nil {
+				return -1, false, fmt.Errorf("invalid read_ahead_kb mount flag %q: %v", mountFlag, err)
+			}
+			if readAheadKBInt < 0 {
+				return -1, false, fmt.Errorf("invalid negative value for read_ahead_kb mount flag: %q", mountFlag)
+			}
+			return readAheadKBInt, true, nil
+		}
+	}
+	return -1, false, nil
+}
+
+func updateReadAhead(targetMountPath string, readAheadKB int64) error {
+	cmd := exec.Command("mountpoint", "-d", targetMountPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		klog.Errorf("Error executing mountpoint command on target path %s", targetMountPath)
+		if exitError, ok := err.(*exec.ExitError); ok {
+			fmt.Printf("Exit code: %d\n", exitError.ExitCode())
+		}
+		return status.Error(codes.Internal, err.Error())
+	}
+
+	outputStr := strings.TrimSpace(string(output))
+	klog.Infof("output of mountpoint for target mount path %s: %s", targetMountPath, output)
+
+	// Update the target value
+	sysClassEchoCmd := fmt.Sprintf("echo %d > /sys/class/bdi/%s/read_ahead_kb", readAheadKB, outputStr)
+	klog.V(2).Infof("Executing command %s", sysClassEchoCmd)
+	cmd = exec.Command("sh", "-c", sysClassEchoCmd)
+	_, err = cmd.CombinedOutput()
+	if err != nil {
+		return status.Error(codes.Internal, err.Error())
+	}
+
+	// Verify updated value
+	sysClassCatCmd := fmt.Sprintf("cat /sys/class/bdi/%s/read_ahead_kb", outputStr)
+	klog.V(2).Infof("Executing command %s", sysClassCatCmd)
+	cmd = exec.Command("sh", "-c", sysClassCatCmd)
+	op, err := cmd.CombinedOutput()
+	if err != nil {
+		return status.Error(codes.Internal, err.Error())
+	}
+	klog.V(2).Infof("Output of %q : %s", sysClassCatCmd, op)
+
+	opStr := strings.TrimSpace(string(op))
+	updatedVal, err := strconv.ParseInt(opStr, 10, 0)
+	if err != nil {
+		return fmt.Errorf("invalid read_ahead_kb %v", err)
+	}
+	if updatedVal != readAheadKB {
+		return fmt.Errorf("mismatch in read_ahead_kb, expected %d, got %d", readAheadKB, updatedVal)
+	}
+
 	return nil
 }
