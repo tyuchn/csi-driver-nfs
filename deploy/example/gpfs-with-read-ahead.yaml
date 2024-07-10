@@ -22,20 +22,20 @@ spec:
       volumes:
       - name: nfs-vol
         persistentVolumeClaim:
-          claimName: nfs-pvc
+          claimName: nfs-pvc-static-read-ahead
 ---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: nfs-pv
+  name: nfs-pv-static-read-ahead
 spec:
   mountOptions:
     - vers=3
-    - read_ahead_kb=15360
+    - nconnect=16
+    - rsize=1048576
+    - wsize=1048576
     - nolock
-    # - nconnect=16
-    # - rsize=1048576
-    # - wsize=1048576
+    - read_ahead_kb=15360
   storageClassName: ""
   capacity:
     storage: 12Ti
@@ -45,22 +45,20 @@ spec:
   volumeMode: Filesystem
   csi:
     driver: nfs.csi.k8s.io
-    volumeHandle: nfs-server.default.svc.cluster.local/gpfs/fs1
+    volumeHandle: nfs-server.default.svc.cluster.local/gpfs/fs1 # the server name doesn't matter, you can put a random string
     volumeAttributes:
-      # share: /gpfs/fs1
-      # server: 10.4.0.194
-      share: /vol1
-      server: 10.94.112.74
+      share: /gpfs/fs1
+      server: 10.12.1.64 # the server name doesn't matter, you can put a random string
 ---
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: nfs-pvc
+  name: nfs-pvc-static-read-ahead
 spec:
   accessModes:
     - ReadWriteMany
   storageClassName: ""
-  volumeName: nfs-pv
+  volumeName: nfs-pv-static-read-ahead
   resources:
     requests:
       storage: 12Ti
