@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ubuntu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ubuntu
+  template:
+    metadata:
+      labels:
+        app: ubuntu
+    spec:
+      containers:
+      - name: ubuntu
+        image: ubuntu:latest
+        command: ["/bin/bash", "-c", "sleep infinity"]
+        volumeMounts:
+        - name: nfs-vol
+          mountPath: /nfs_vol
+      volumes:
+      - name: nfs-vol
+        persistentVolumeClaim:
+          claimName: nfs-pvc-static-read-ahead
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nfs-pv-static-read-ahead
+spec:
+  mountOptions:
+    - vers=3
+    - nconnect=16
+    - rsize=1048576
+    - wsize=1048576
+    - nolock
+    - read_ahead_kb=15360
+  storageClassName: ""
+  capacity:
+    storage: 12Ti
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  volumeMode: Filesystem
+  csi:
+    driver: nfs.csi.k8s.io
+    volumeHandle: nfs-server.default.svc.cluster.local/gpfs/fs1 # the server name doesn't matter, you can put a random string
+    volumeAttributes:
+      share: /gpfs/fs1
+      server: 10.12.1.64 # the server name doesn't matter, you can put a random string
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: nfs-pvc-static-read-ahead
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: nfs-pv-static-read-ahead
+  resources:
+    requests:
+      storage: 12Ti
