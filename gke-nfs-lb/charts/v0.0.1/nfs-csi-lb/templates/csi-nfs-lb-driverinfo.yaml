@@ -1,0 +1,10 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: CSIDriver
+metadata:
+  name: nfs.csi.k8s.gke.io
+spec:
+  attachRequired: true
+  volumeLifecycleModes:
+    - Persistent
+  fsGroupPolicy: None

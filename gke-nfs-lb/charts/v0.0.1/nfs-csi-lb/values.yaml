@@ -1,0 +1,12 @@
+customLabels: {}
+image:
+    nfs:
+        repository: registry.k8s.io/sig-storage/nfsplugin
+        tag: latest
+        pullPolicy: Always
+    csiAttacher:
+        repository: registry.k8s.io/sig-storage/csi-attacher
+        tag: v4.6.1
+        pullPolicy: IfNotPresent
+controller:
+  ipaddressList: "10.4.0.45"
